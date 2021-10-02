@@ -1,51 +1,75 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
+import { toast } from 'react-hot-toast';
+import { FiPower } from 'react-icons/fi';
+import { GiWaveCrest } from 'react-icons/gi';
+import { SiEthereum } from 'react-icons/si';
+import { formatDistanceToNowStrict } from 'date-fns';
 
-import contractABI from '../../artifacts/contracts/WavePortal.sol/WavePortal.json';
-
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+import { useContract } from '../hooks/useContract';
 
 export default function Home() {
   const [currentAccount, setCurrentAccount] = useState('');
   const [allWaves, setAllWaves] = useState([]);
   const [totalWaves, setTotalWaves] = useState(0);
+  const [wavesByUser, setWavesByUser] = useState(0);
+  const [earnings, setEarnings] = useState(0);
   const [loading, setLoading] = useState(false);
+  const wavePortalContract = useContract();
 
   useEffect(() => {
     checkIfWalletIsConnected();
   }, []);
 
+  useEffect(() => {
+    (() => {
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', async accounts => {
+          if (accounts.length > 0) {
+            await Promise.all([getAllWaves(), getWavesByUser(), getEarningsByUser()]);
+            setCurrentAccount(accounts[0]);
+          }
+        });
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (wavePortalContract && currentAccount) {
+      wavePortalContract.on('NewWave', (from, timestamp, message) => {
+        setAllWaves(prevState => [
+          ...prevState,
+          {
+            address: from,
+            timestamp: new Date(timestamp * 1000),
+            message: message,
+          },
+        ]);
+      });
+    }
+  }, [wavePortalContract]);
+
   const checkIfWalletIsConnected = async () => {
     setLoading(true);
 
     if (!window.ethereum) {
-      alert('Make sure you have metamask!');
+      toast.error('Please make sure you have metamask!', { position: 'top-center' });
       setLoading(false);
       return;
     }
 
     const accounts = await window.ethereum.request({ method: 'eth_accounts' });
 
-    if (accounts.length) {
+    if (accounts.length && wavePortalContract) {
       const account = accounts[0];
       setCurrentAccount(account);
-      await getAllWaves();
-
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const wavePortalContract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        contractABI.abi,
-        signer
-      );
+      await Promise.all([getAllWaves(), getWavesByUser(), getEarningsByUser()]);
 
       const count = await wavePortalContract.getTotalWaves();
-      console.log('Found an authorized account:', account);
       setTotalWaves(count.toNumber());
       setLoading(false);
     } else {
       setLoading(false);
-      alert('No authorized account found');
     }
   };
 
@@ -53,8 +77,8 @@ export default function Home() {
     try {
       const { ethereum } = window;
 
-      if (!ethereum) {
-        alert('Get MetaMask!');
+      if (!window.ethereum) {
+        toast.error('Please get Metamask');
         return;
       }
 
@@ -62,25 +86,16 @@ export default function Home() {
         method: 'eth_requestAccounts',
       });
 
-      console.log('Connected', accounts[0]);
       setCurrentAccount(accounts[0]);
+      await Promise.all([getAllWaves(), getWavesByUser(), getEarningsByUser()]);
     } catch (error) {
-      console.error(error);
+      toast.error(error.message);
     }
   };
 
   const getAllWaves = async () => {
     try {
-      const { ethereum } = window;
-      if (ethereum) {
-        const provider = new ethers.providers.Web3Provider(ethereum);
-        const signer = provider.getSigner();
-        const wavePortalContract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          contractABI.abi,
-          signer
-        );
-
+      if (window.ethereum && wavePortalContract) {
         const waves = await wavePortalContract.getAllWaves();
 
         let wavesCleaned = [];
@@ -93,27 +108,33 @@ export default function Home() {
         });
 
         setAllWaves(wavesCleaned);
-
-        /**
-         * Listen in for emitter events!
-         */
-        wavePortalContract.on('NewWave', (from, timestamp, message) => {
-          console.log('NewWave', from, timestamp, message);
-
-          setAllWaves(prevState => [
-            ...prevState,
-            {
-              address: from,
-              timestamp: new Date(timestamp * 1000),
-              message: message,
-            },
-          ]);
-        });
       } else {
         console.log("Ethereum object doesn't exist!");
       }
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  const getWavesByUser = async () => {
+    try {
+      if (window.ethereum && wavePortalContract) {
+        const wavesByUser = await wavePortalContract.getTotalWavesByUser();
+        setWavesByUser(wavesByUser.toNumber());
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const getEarningsByUser = async () => {
+    try {
+      if (window.ethereum && wavePortalContract) {
+        const earningsByUser = await wavePortalContract.getTotalEarningsByUser();
+        setEarnings(ethers.utils.formatEther(earningsByUser.toString()));
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -123,45 +144,22 @@ export default function Home() {
     const message = formData.get('message');
 
     if (!message) {
-      alert('Wave at me with a message, please!');
+      toast.error('Wave at me with a message, please!');
       return;
     }
 
     try {
-      if (window.ethereum) {
+      if (window.ethereum && wavePortalContract) {
         setLoading(true);
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
-        const wavePortalContract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          contractABI.abi,
-          signer
-        );
-
-        /*
-         * Execute the actual wave from your smart contract
-         */
         const waveTxn = await wavePortalContract.wave(message, {
           gasLimit: 300000,
         });
-        console.log('Mining...', waveTxn.hash);
 
         await waveTxn.wait();
-        console.log('Mined -- ', waveTxn.hash);
 
         let count = await wavePortalContract.getTotalWaves();
-        const waves = await wavePortalContract.getAllWaves();
-
-        let wavesCleaned = waves.map(wave => {
-          return {
-            address: wave.waver,
-            timestamp: new Date(wave.timestamp * 1000),
-            message: wave.message,
-          };
-        });
 
         setLoading(false);
-        setAllWaves(wavesCleaned);
         setTotalWaves(count.toNumber());
       }
     } catch (error) {
@@ -170,48 +168,101 @@ export default function Home() {
   };
 
   return (
-    <div className="mainContainer">
-      <div className="dataContainer">
-        <div className="header">👋 Hey there!</div>
-
-        <div className="bio">
-          I am Ochuko and I worked on self-driving cars so that's pretty cool right?
-          Connect your Ethereum wallet and wave at me!
+    <section className="min-h-screen flex flex-col max-w-[40rem] mx-auto px-4 text-gray-600">
+      <div className="flex items-baseline py-4">
+        <div className="flex items-center gap-x-2">
+          <span>Total 👋</span>
+          <span className="grid place-items-center font-light text-black">
+            {totalWaves}
+          </span>
         </div>
 
-        <div className="waveDisplay">
-          {loading ? 'Loading...' : `Total Waves: ${totalWaves}`}
+        <div className="mx-auto">
+          <h1 className="flex items-center justify-center mb-1 text-2xl font-light">
+            <GiWaveCrest color="#1D4ED8" />
+            <span>WavePortal</span>
+          </h1>
+
+          {currentAccount ? (
+            <div className="bg-purple-300 font-light px-2 py-[0.1rem] mx-auto rounded-lg text-white text-sm w-max">
+              {currentAccount.substr(0, 6) + '...' + currentAccount.substr(-6)}
+            </div>
+          ) : null}
         </div>
 
-        <form className="waveForm" onSubmit={wave}>
-          <textarea
-            className="textarea"
-            name="message"
-            rows="4"
-            placeholder="Enter message..."
-          ></textarea>
-
-          <button className="waveButton" type="submit">
-            Wave at Me
-          </button>
-        </form>
-
-        {!currentAccount && (
-          <button className="waveButton" onClick={connectWallet}>
-            Connect Wallet
+        {currentAccount ? (
+          <div className="flex gap-x-2">
+            <div className="flex items-center">
+              <span className="mr-1">👋</span>
+              {wavesByUser}
+            </div>
+            <div className="flex items-center">
+              <SiEthereum className="" />
+              {earnings}
+            </div>
+          </div>
+        ) : (
+          <button
+            className="bg-purple-700 border border-purple-900 rounded-full p-[0.4rem] shadow-md text-white"
+            onClick={connectWallet}
+          >
+            <FiPower />
           </button>
         )}
-
-        {allWaves.map((wave, index) => {
-          return (
-            <div key={index} className="message">
-              <div>Address: {wave.address}</div>
-              <div>Time: {wave.timestamp.toString()}</div>
-              <div>Message: {wave.message}</div>
-            </div>
-          );
-        })}
       </div>
-    </div>
+
+      <div className="font-semibold mt-8 text-xl">👋 Hello, Welcome to Wave Portal!</div>
+
+      <p className="px-2 mt-4 mb-8 rounded leading-6">
+        I'm Ochuko and I'm having fun with Web3. Wave at me with a nice message and you
+        just might win some fake ether.{' '}
+        {!currentAccount ? 'Connect your Ethereum wallet and wave at me!' : null}
+      </p>
+
+      {currentAccount ? (
+        <div className="px-4 py-3 bg-white h-80 mt-auto mb-4 overflow-auto rounded">
+          {allWaves.map((wave, index) => {
+            const address = wave.address;
+            return (
+              <div
+                key={index}
+                className={`bg-purple-100 mb-4 px-3 py-2 rounded-2xl rounded-tl-sm`}
+              >
+                <div className="text-sm text-gray-400">
+                  {address.substr(0, 5) + '...' + address.substr(-4)}
+                </div>
+                <div>{wave.message}</div>
+                <div className="text-sm text-right text-gray-400">
+                  {formatDistanceToNowStrict(new Date(wave.timestamp.toString()))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <button
+          className="bg-purple-700 py-2 mb-4 rounded-md text-center text-white w-full"
+          onClick={connectWallet}
+        >
+          Connect Wallet
+        </button>
+      )}
+
+      <form className={`pb-8 ${currentAccount ? 'mt-auto' : null}`} onSubmit={wave}>
+        <textarea
+          className="border border-gray-300 rounded p-4 text-sm w-full focus:outline-none focus:border-purple-600"
+          name="message"
+          rows="2"
+          placeholder="Enter message..."
+        ></textarea>
+
+        <button
+          className="bg-purple-900 py-2 rounded-md text-center text-white w-full"
+          type="submit"
+        >
+          {loading ? 'Mining...' : 'Wave at Me'}
+        </button>
+      </form>
+    </section>
   );
 }
