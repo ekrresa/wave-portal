@@ -47,7 +47,7 @@ export default function Home() {
         ]);
       });
     }
-  }, [wavePortalContract]);
+  }, [wavePortalContract, currentAccount]);
 
   const checkIfWalletIsConnected = async () => {
     setLoading(true);
