@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 
-import contractABI from '../../artifacts/contracts/WavePortal.sol/WavePortal.json';
+import contractABI from '../assets/abi.json';
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
