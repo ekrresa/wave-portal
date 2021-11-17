@@ -3,5 +3,14 @@
 @tailwind utilities;
 
 body {
-  @apply bg-bright-purple;
+  @apply bg-dark-purple;
+  @apply text-blue-choo;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply text-light-ray;
 }
