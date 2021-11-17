@@ -51,21 +51,6 @@ export default function Home() {
     })();
   }, []);
 
-  useEffect(() => {
-    if (wavePortalContract && currentAccount) {
-      wavePortalContract.on('NewWave', (from, timestamp, message) => {
-        setAllWaves(prevState => [
-          ...prevState,
-          {
-            address: from,
-            timestamp: new Date(timestamp * 1000),
-            message: message,
-          },
-        ]);
-      });
-    }
-  }, [wavePortalContract, currentAccount]);
-
   const checkIfWalletIsConnected = async () => {
     setLoading(true);
 
@@ -181,13 +166,19 @@ export default function Home() {
 
         await waveTxn.wait();
 
-        let count = await wavePortalContract.getTotalWaves();
+        let [count] = await Promise.all([
+          wavePortalContract.getTotalWaves(),
+          getAllWaves(),
+          getWavesByUser(),
+          getEarningsByUser(),
+        ]);
 
         setLoading(false);
         setTotalWaves(count.toNumber());
         formRef.current.reset();
       }
     } catch (error) {
+      setLoading(false);
       console.error(error);
     }
   };
