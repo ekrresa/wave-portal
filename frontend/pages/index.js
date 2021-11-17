@@ -21,7 +21,7 @@ export default function Home() {
   const wavePortalContract = useContract();
   const formRef = useRef();
   const isMobile = useMediaQuery({
-    query: '(max-width: 660px)',
+    query: '(max-width: 640px)',
   });
 
   useEffect(() => {
@@ -43,6 +43,8 @@ export default function Home() {
           if (accounts.length > 0) {
             await Promise.all([getAllWaves(), getWavesByUser(), getEarningsByUser()]);
             setCurrentAccount(accounts[0]);
+          } else {
+            setCurrentAccount('');
           }
         });
       }
@@ -241,7 +243,11 @@ export default function Home() {
         </div>
       </div>
 
-      <div className={`grid mt-16 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 gap-8'}`}>
+      <div
+        className={`grid mt-16 grid-cols-1 ${
+          currentAccount ? 'sm:grid-cols-2 sm:gap-8' : ''
+        }`}
+      >
         <section className="">
           <h2 className={`font-medium text-center text-3xl ${isMobile ? '' : 'mt-20'}`}>
             Welcome to Wave Portal!
@@ -250,6 +256,8 @@ export default function Home() {
           <p className="font-light px-2 mt-8 rounded leading-6 text-center">
             Hey, I'm Ochuko and I'm having fun with Web3. Wave at me with a nice message
             and you just might win some fake ether.{' '}
+          </p>
+          <p className="font-light px-2 mt-4 leading-6 text-center">
             {!currentAccount ? 'Connect your Ethereum wallet and wave at me!' : null}
           </p>
 
@@ -298,7 +306,7 @@ export default function Home() {
           )}
         </section>
 
-        {!isMobile && (
+        {!isMobile && currentAccount && (
           <section className="flex flex-col h-[35rem]">
             <div className="px-4 py-3 bg-blue-choo flex-auto overflow-auto rounded shadow-inner">
               {allWaves.map((wave, index) => {
