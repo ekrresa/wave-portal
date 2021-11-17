@@ -18,6 +18,7 @@ module.exports = {
     rinkeby: {
       url: process.env.STAGING_ALCHEMY_URL,
       accounts: [process.env.PRIVATE_KEY],
+      chainId: 1337,
     },
   },
 };
