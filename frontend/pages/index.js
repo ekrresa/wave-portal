@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { toast } from 'react-hot-toast';
 import { IoWallet } from 'react-icons/io5';
+import { IoIosCloseCircle } from 'react-icons/io';
 import { GiWaveCrest } from 'react-icons/gi';
 import { SiEthereum } from 'react-icons/si';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -17,6 +18,7 @@ export default function Home() {
   const [wavesByUser, setWavesByUser] = useState(0);
   const [earnings, setEarnings] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showBanner, setBanner] = useState(false);
 
   const wavePortalContract = useContract();
   const formRef = useRef();
@@ -35,6 +37,10 @@ export default function Home() {
       }
     })();
   }, [currentAccount]);
+
+  useEffect(() => {
+    setBanner(true);
+  }, []);
 
   useEffect(() => {
     (() => {
@@ -185,6 +191,16 @@ export default function Home() {
 
   return (
     <main className="h-screen max-w-[80rem] mx-auto px-4">
+      {showBanner && (
+        <div className="bg-light-beige fixed w-full text-dark-purple flex justify-center items-center top-0 left-0 text-sm py-1">
+          Smart contract hosted on Rinkeby testnet
+          <IoIosCloseCircle
+            className="cursor-pointer ml-2 text-lg"
+            onClick={() => setBanner(false)}
+          />
+        </div>
+      )}
+
       <header className="flex justify-between py-8">
         <h1 className="text-3xl font-semibold whitespace-nowrap sm:text-4xl">
           <GiWaveCrest className="inline-block align-top" color="#eebbc3" />
